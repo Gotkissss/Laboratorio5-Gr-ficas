@@ -3,7 +3,7 @@
 
 use crate::fragment::Fragment;
 use crate::framebuffer::{Framebuffer, HEIGHT, WIDTH};
-use crate::triangle::{triangle_barycentric, triangle_wireframe, TriangleMode};
+use crate::triangle::{triangle_barycentric, triangle_scanline, triangle_wireframe, TriangleMode};
 use crate::vertex::Vertex;
 
 /// Agrupa los vértices de tres en tres. Si sobran vértices al final se ignoran.
@@ -34,6 +34,7 @@ pub fn rasterize_in(
         let triangle_fragments = match mode {
             TriangleMode::Wireframe => triangle_wireframe(v1, v2, v3, width, height),
             TriangleMode::FilledBarycentric => triangle_barycentric(v1, v2, v3, width, height),
+            TriangleMode::FilledScanline => triangle_scanline(v1, v2, v3, width, height),
         };
         fragments.extend(triangle_fragments);
     }
