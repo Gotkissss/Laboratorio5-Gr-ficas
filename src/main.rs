@@ -4,6 +4,7 @@ use rellenar_triangulos::color::Color as Rgb;
 use rellenar_triangulos::framebuffer::{Framebuffer, HEIGHT, WIDTH};
 use rellenar_triangulos::pipeline::{primitive_assembly, process_fragments, rasterize};
 use rellenar_triangulos::scenes;
+use rellenar_triangulos::triangle::TriangleMode;
 
 fn main() {
     let (mut window, thread) = raylib::init()
@@ -25,7 +26,7 @@ fn main() {
 
     while !window.window_should_close() {
         framebuffer.clear();
-        let fragments = rasterize(&triangles);
+        let fragments = rasterize(&triangles, TriangleMode::FilledBarycentric);
         process_fragments(&mut framebuffer, &fragments);
 
         texture

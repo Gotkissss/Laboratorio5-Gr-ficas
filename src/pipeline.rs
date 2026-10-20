@@ -3,7 +3,7 @@
 
 use crate::fragment::Fragment;
 use crate::framebuffer::{Framebuffer, HEIGHT, WIDTH};
-use crate::triangle::triangle_wireframe;
+use crate::triangle::{triangle_barycentric, triangle_wireframe, TriangleMode};
 use crate::vertex::Vertex;
 
 /// Agrupa los vértices de tres en tres. Si sobran vértices al final se ignoran.
@@ -15,16 +15,27 @@ pub fn primitive_assembly(vertices: &[Vertex]) -> Vec<[Vertex; 3]> {
 }
 
 /// Rasteriza usando el tamaño por defecto del framebuffer.
-pub fn rasterize(triangles: &[[Vertex; 3]]) -> Vec<Fragment> {
-    rasterize_in(triangles, WIDTH, HEIGHT)
+pub fn rasterize(triangles: &[[Vertex; 3]], mode: TriangleMode) -> Vec<Fragment> {
+    rasterize_in(triangles, mode, WIDTH, HEIGHT)
 }
 
 /// Igual que `rasterize`, pero con un tamaño de imagen cualquiera
 /// (lo uso en las pruebas para tener imágenes pequeñas).
-pub fn rasterize_in(triangles: &[[Vertex; 3]], width: i32, height: i32) -> Vec<Fragment> {
+pub fn rasterize_in(
+    triangles: &[[Vertex; 3]],
+    mode: TriangleMode,
+    width: i32,
+    height: i32,
+) -> Vec<Fragment> {
     let mut fragments = Vec::new();
     for [v1, v2, v3] in triangles {
-        fragments.extend(triangle_wireframe(v1, v2, v3, width, height));
+        // Lo único que cambia entre modos es cómo se generan los fragmentos;
+        // el ensamblaje y el procesamiento de fragmentos son los mismos.
+        let triangle_fragments = match mode {
+            TriangleMode::Wireframe => triangle_wireframe(v1, v2, v3, width, height),
+            TriangleMode::FilledBarycentric => triangle_barycentric(v1, v2, v3, width, height),
+        };
+        fragments.extend(triangle_fragments);
     }
     fragments
 }
