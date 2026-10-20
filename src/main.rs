@@ -2,6 +2,8 @@ use raylib::prelude::*;
 
 use rellenar_triangulos::color::Color as Rgb;
 use rellenar_triangulos::framebuffer::{Framebuffer, HEIGHT, WIDTH};
+use rellenar_triangulos::pipeline::{primitive_assembly, process_fragments, rasterize};
+use rellenar_triangulos::scenes;
 
 fn main() {
     let (mut window, thread) = raylib::init()
@@ -18,8 +20,13 @@ fn main() {
         .load_texture_from_image(&thread, &image)
         .expect("no se pudo crear la textura");
 
+    let scene = scenes::showcase();
+    let triangles = primitive_assembly(&scene.vertices);
+
     while !window.window_should_close() {
         framebuffer.clear();
+        let fragments = rasterize(&triangles);
+        process_fragments(&mut framebuffer, &fragments);
 
         texture
             .update_texture(&framebuffer.to_rgba_bytes())

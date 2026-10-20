@@ -5,4 +5,7 @@ pub mod color;
 pub mod fragment;
 pub mod framebuffer;
 pub mod line;
+pub mod pipeline;
+pub mod scenes;
+pub mod triangle;
 pub mod vertex;
