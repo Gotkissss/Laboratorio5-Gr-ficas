@@ -49,3 +49,8 @@ pub fn showcase() -> Scene {
         ],
     }
 }
+
+/// Todas las escenas que se pueden ver en la ventana (con las flechas).
+pub fn all() -> Vec<Scene> {
+    vec![showcase()]
+}
