@@ -25,11 +25,25 @@ pub fn triangle_wireframe(
     height: i32,
 ) -> Vec<Fragment> {
     let mut fragments = Vec::new();
-    fragments.extend(line(v1, v2));
-    fragments.extend(line(v2, v3));
-    fragments.extend(line(v3, v1));
-    fragments.retain(|f| f.x >= 0 && f.y >= 0 && f.x < width && f.y < height);
+    triangle_wireframe_into(v1, v2, v3, width, height, &mut fragments);
     fragments
+}
+
+/// Igual que `triangle_wireframe`, pero agrega los fragmentos a `out`.
+pub fn triangle_wireframe_into(
+    v1: &Vertex,
+    v2: &Vertex,
+    v3: &Vertex,
+    width: i32,
+    height: i32,
+    out: &mut Vec<Fragment>,
+) {
+    for (a, b) in [(v1, v2), (v2, v3), (v3, v1)] {
+        let visible = line(a, b)
+            .into_iter()
+            .filter(|f| f.x >= 0 && f.y >= 0 && f.x < width && f.y < height);
+        out.extend(visible);
+    }
 }
 
 /// Punto en f64. Hago las cuentas del relleno en f64 para tener más precisión.
@@ -77,13 +91,27 @@ pub fn triangle_barycentric(
     width: i32,
     height: i32,
 ) -> Vec<Fragment> {
+    let mut fragments = Vec::new();
+    triangle_barycentric_into(v1, v2, v3, width, height, &mut fragments);
+    fragments
+}
+
+/// Versión que agrega los fragmentos a un Vec que ya existe (ver `rasterize_in`).
+pub fn triangle_barycentric_into(
+    v1: &Vertex,
+    v2: &Vertex,
+    v3: &Vertex,
+    width: i32,
+    height: i32,
+    out: &mut Vec<Fragment>,
+) {
     let (a, mut b, mut c) = (to_point(v1), to_point(v2), to_point(v3));
 
     // Área (con signo) del triángulo completo. Si es cero los vértices están
     // alineados: no hay interior y no podemos dividir entre ella.
     let mut area = edge_function(a, b, c);
     if area == 0.0 {
-        return Vec::new();
+        return;
     }
     // Si los vértices vienen en el otro orden, intercambio dos para que el área
     // sea positiva. Así el triángulo no desaparece al invertir el orden y la
@@ -111,7 +139,6 @@ pub fn triangle_barycentric(
     let y_end = ((max_y - 0.5).floor() as i32).min(height - 1);
 
     let color = v1.color;
-    let mut fragments = Vec::new();
 
     for y in y_start..=y_end {
         for x in x_start..=x_end {
@@ -127,12 +154,10 @@ pub fn triangle_barycentric(
             let w3 = edge_function(a, b, p) / area;
 
             if inside(w1, top_left_1) && inside(w2, top_left_2) && inside(w3, top_left_3) {
-                fragments.push(Fragment::new(x, y, color));
+                out.push(Fragment::new(x, y, color));
             }
         }
     }
-
-    fragments
 }
 
 /// x donde la arista (a, b) cruza la recta horizontal y.
@@ -156,11 +181,25 @@ pub fn triangle_scanline(
     width: i32,
     height: i32,
 ) -> Vec<Fragment> {
+    let mut fragments = Vec::new();
+    triangle_scanline_into(v1, v2, v3, width, height, &mut fragments);
+    fragments
+}
+
+/// Versión que agrega los fragmentos a un Vec que ya existe (ver `rasterize_in`).
+pub fn triangle_scanline_into(
+    v1: &Vertex,
+    v2: &Vertex,
+    v3: &Vertex,
+    width: i32,
+    height: i32,
+    out: &mut Vec<Fragment>,
+) {
     let mut points = [to_point(v1), to_point(v2), to_point(v3)];
 
     // Mismo criterio que el baricéntrico: sin área no hay interior.
     if edge_function(points[0], points[1], points[2]) == 0.0 {
-        return Vec::new();
+        return;
     }
 
     // Ordeno por y: top arriba, mid en medio, bottom abajo (y crece hacia abajo).
@@ -172,7 +211,6 @@ pub fn triangle_scanline(
     let y_end = ((bottom.y - 0.5).ceil() as i32).min(height); // exclusivo
 
     let color = v1.color;
-    let mut fragments = Vec::new();
 
     for y in y_start..y_end {
         let yc = y as f64 + 0.5;
@@ -197,11 +235,9 @@ pub fn triangle_scanline(
         let x_end = ((x_right - 0.5).ceil() as i32).min(width); // exclusivo
 
         for x in x_start..x_end {
-            fragments.push(Fragment::new(x, y, color));
+            out.push(Fragment::new(x, y, color));
         }
     }
-
-    fragments
 }
 
 #[cfg(test)]
