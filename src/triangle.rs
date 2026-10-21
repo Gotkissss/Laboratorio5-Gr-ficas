@@ -52,6 +52,22 @@ fn edge_function(a: Point, b: Point, p: Point) -> f64 {
     (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)
 }
 
+/// Regla top-left (la misma idea que usan las GPU). Con el área positiva y y
+/// creciendo hacia abajo, una arista a -> b es:
+/// - "de arriba" (top) si es horizontal y el triángulo queda debajo (b.x > a.x),
+/// - "izquierda" (left) si el triángulo queda a su derecha (b.y < a.y).
+/// Un centro justo sobre la arista solo cuenta si la arista es top o left.
+/// Es exactamente lo que hace el scanline con y_arriba <= yc < y_abajo
+/// y x_izq <= xc < x_der.
+fn is_top_left(a: Point, b: Point) -> bool {
+    (a.y == b.y && b.x > a.x) || b.y < a.y
+}
+
+/// ¿El punto está adentro respecto a una arista?
+fn inside(w: f64, top_left: bool) -> bool {
+    w > 0.0 || (w == 0.0 && top_left)
+}
+
 /// Algoritmo 1: recorrer la caja que encierra al triángulo y quedarse con los
 /// centros de píxel cuyas tres coordenadas baricéntricas indican que están adentro.
 pub fn triangle_barycentric(
@@ -61,14 +77,26 @@ pub fn triangle_barycentric(
     width: i32,
     height: i32,
 ) -> Vec<Fragment> {
-    let (a, b, c) = (to_point(v1), to_point(v2), to_point(v3));
+    let (a, mut b, mut c) = (to_point(v1), to_point(v2), to_point(v3));
 
     // Área (con signo) del triángulo completo. Si es cero los vértices están
     // alineados: no hay interior y no podemos dividir entre ella.
-    let area = edge_function(a, b, c);
+    let mut area = edge_function(a, b, c);
     if area == 0.0 {
         return Vec::new();
     }
+    // Si los vértices vienen en el otro orden, intercambio dos para que el área
+    // sea positiva. Así el triángulo no desaparece al invertir el orden y la
+    // regla top-left de abajo siempre ve las aristas en la misma dirección.
+    if area < 0.0 {
+        std::mem::swap(&mut b, &mut c);
+        area = -area;
+    }
+
+    // Regla top-left para los centros que caen justo sobre una arista (w = 0).
+    let top_left_1 = is_top_left(b, c);
+    let top_left_2 = is_top_left(c, a);
+    let top_left_3 = is_top_left(a, b);
 
     // Caja envolvente: solo los píxeles cuyo centro puede caer en el triángulo,
     // recortada a los límites de la imagen.
@@ -92,13 +120,13 @@ pub fn triangle_barycentric(
                 y: y as f64 + 0.5,
             };
 
-            // Coordenadas baricéntricas. Dividir entre el área con signo hace que
-            // el resultado no dependa del orden (horario/antihorario) de los vértices.
+            // Coordenadas baricéntricas (suman 1). Cada una es positiva si el
+            // punto está del lado de adentro de la arista opuesta a su vértice.
             let w1 = edge_function(b, c, p) / area;
             let w2 = edge_function(c, a, p) / area;
             let w3 = edge_function(a, b, p) / area;
 
-            if w1 >= 0.0 && w2 >= 0.0 && w3 >= 0.0 {
+            if inside(w1, top_left_1) && inside(w2, top_left_2) && inside(w3, top_left_3) {
                 fragments.push(Fragment::new(x, y, color));
             }
         }
