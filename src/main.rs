@@ -2,6 +2,7 @@ use std::time::Instant;
 
 use raylib::prelude::*;
 
+use rellenar_triangulos::benchmark::{benchmark_sets, measure};
 use rellenar_triangulos::color::Color as Rgb;
 use rellenar_triangulos::compare::compare;
 use rellenar_triangulos::framebuffer::{Framebuffer, HEIGHT, WIDTH};
@@ -25,7 +26,63 @@ fn main() {
         run_comparison();
         return;
     }
+    if args.iter().any(|a| a == "--measure") {
+        run_measurement();
+        return;
+    }
     run_window();
+}
+
+/// `cargo run --release -- --measure`
+/// Mide cada modo sobre los mismos triángulos y reporta la mediana.
+/// La tabla se imprime en Markdown y se guarda en resultados/mediciones.md.
+fn run_measurement() {
+    const REPETITIONS: u32 = 11;
+    if cfg!(debug_assertions) {
+        println!("OJO: esto es un build de debug, usa `cargo run --release -- --measure`.\n");
+    }
+
+    let modes = [
+        TriangleMode::Wireframe,
+        TriangleMode::FilledBarycentric,
+        TriangleMode::FilledScanline,
+    ];
+
+    let mut table = String::new();
+    table.push_str(&format!(
+        "Mediana de {REPETITIONS} repeticiones (después de 1 de calentamiento).\n\n"
+    ));
+    table.push_str("| Conjunto | Modo | Fragmentos | Iteraciones | Mediana total | Min | Max | Por rasterización | ns/fragmento |\n");
+    table.push_str("|---|---|---:|---:|---:|---:|---:|---:|---:|\n");
+
+    for set in benchmark_sets() {
+        println!(
+            "Midiendo: {} ({} triángulos)",
+            set.name,
+            set.triangles.len()
+        );
+        for mode in modes {
+            let m = measure(&set.triangles, mode, set.iterations, REPETITIONS);
+            let row = format!(
+                "| {} | {} | {} | {} | {:.2} ms | {:.2} ms | {:.2} ms | {:.3} µs | {:.2} |\n",
+                set.name,
+                mode_name(mode),
+                m.fragments,
+                m.iterations,
+                m.median().as_secs_f64() * 1e3,
+                m.min().as_secs_f64() * 1e3,
+                m.max().as_secs_f64() * 1e3,
+                m.median_per_iteration().as_secs_f64() * 1e6,
+                m.ns_per_fragment()
+            );
+            table.push_str(&row);
+        }
+    }
+
+    println!("\n{table}");
+    std::fs::create_dir_all("resultados").expect("no se pudo crear la carpeta resultados");
+    std::fs::write("resultados/mediciones.md", &table).expect("no se pudo guardar la tabla");
+    println!("Tabla guardada en resultados/mediciones.md");
 }
 
 /// `cargo run --release -- --compare`
