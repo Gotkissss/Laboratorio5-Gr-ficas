@@ -9,6 +9,7 @@ use rellenar_triangulos::framebuffer::{Framebuffer, HEIGHT, WIDTH};
 use rellenar_triangulos::pipeline::{primitive_assembly, process_fragments, rasterize};
 use rellenar_triangulos::scenes;
 use rellenar_triangulos::triangle::TriangleMode;
+use rellenar_triangulos::vertex::Vertex;
 
 const BACKGROUND: u32 = 0x1E1E2E;
 
@@ -34,7 +35,94 @@ fn main() {
         run_profile_benchmark(&args);
         return;
     }
+    if args.iter().any(|a| a == "--screenshots") {
+        run_screenshots();
+        return;
+    }
     run_window();
+}
+
+fn file_name(mode: TriangleMode) -> &'static str {
+    match mode {
+        TriangleMode::Wireframe => "wireframe",
+        TriangleMode::FilledBarycentric => "baricentrico",
+        TriangleMode::FilledScanline => "scanline",
+    }
+}
+
+/// Pasa una escena por todo el pipeline y devuelve el framebuffer resultante.
+fn render(vertices: &[Vertex], mode: TriangleMode) -> Framebuffer {
+    let mut framebuffer = Framebuffer::new(WIDTH, HEIGHT, Rgb::from_hex(BACKGROUND));
+    let triangles = primitive_assembly(vertices);
+    let fragments = rasterize(&triangles, mode);
+    process_fragments(&mut framebuffer, &fragments);
+    framebuffer
+}
+
+/// Guarda el framebuffer como PNG usando las funciones de imagen de raylib
+/// (no necesitan que haya una ventana abierta).
+fn save_png(framebuffer: &Framebuffer, path: &str) {
+    let mut image = Image::gen_image_color(framebuffer.width, framebuffer.height, Color::BLACK);
+    for y in 0..framebuffer.height {
+        for x in 0..framebuffer.width {
+            let c = framebuffer.get_pixel(x, y).unwrap();
+            image.draw_pixel(x, y, Color::new(c.r, c.g, c.b, 255));
+        }
+    }
+    image.export_image(path);
+    println!("Guardado {path}");
+}
+
+/// Amplía una zona del framebuffer (cada píxel se vuelve un cuadro de `scale`
+/// x `scale`) y dibuja una cuadrícula para poder contar píxeles.
+fn zoom(source: &Framebuffer, x0: i32, y0: i32, w: i32, h: i32, scale: i32) -> Framebuffer {
+    let grid = Rgb::from_hex(0x45475A);
+    let mut out = Framebuffer::new(w * scale, h * scale, source.background_color);
+    for y in 0..h * scale {
+        for x in 0..w * scale {
+            let color = if x % scale == 0 || y % scale == 0 {
+                grid
+            } else {
+                source
+                    .get_pixel(x0 + x / scale, y0 + y / scale)
+                    .unwrap_or(source.background_color)
+            };
+            out.set_pixel(x, y, color);
+        }
+    }
+    out
+}
+
+/// `cargo run --release -- --screenshots`
+/// Genera las imágenes del README en la carpeta capturas/.
+fn run_screenshots() {
+    std::fs::create_dir_all("capturas").expect("no se pudo crear la carpeta capturas");
+    let showcase = scenes::showcase();
+    let fan = scenes::fan();
+
+    for mode in [
+        TriangleMode::Wireframe,
+        TriangleMode::FilledBarycentric,
+        TriangleMode::FilledScanline,
+    ] {
+        let name = file_name(mode);
+        let framebuffer = render(&showcase.vertices, mode);
+        save_png(&framebuffer, &format!("capturas/{name}.png"));
+        // Acercamiento al triángulo pequeño (amarillo) para ver los píxeles.
+        save_png(
+            &zoom(&framebuffer, 244, 36, 28, 28, 12),
+            &format!("capturas/zoom_pequeno_{name}.png"),
+        );
+        // Acercamiento a la diagonal que comparten los dos triángulos de abajo.
+        save_png(
+            &zoom(&framebuffer, 540, 480, 40, 30, 10),
+            &format!("capturas/zoom_arista_{name}.png"),
+        );
+        save_png(
+            &render(&fan.vertices, mode),
+            &format!("capturas/abanico_{name}.png"),
+        );
+    }
 }
 
 /// Busca el valor que sigue a una opción, por ejemplo `--mode scan`.
