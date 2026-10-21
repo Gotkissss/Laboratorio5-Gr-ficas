@@ -5,3 +5,8 @@ edition = "2021"
 
 [dependencies]
 raylib = "5.5.1"
+
+# Símbolos de depuración en release para que el flamegraph muestre los nombres
+# de las funciones. No cambia las optimizaciones, solo el tamaño del ejecutable.
+[profile.release]
+debug = true

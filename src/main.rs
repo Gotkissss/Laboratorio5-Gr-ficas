@@ -30,7 +30,55 @@ fn main() {
         run_measurement();
         return;
     }
+    if args.iter().any(|a| a == "--benchmark-triangles") {
+        run_profile_benchmark(&args);
+        return;
+    }
     run_window();
+}
+
+/// Busca el valor que sigue a una opción, por ejemplo `--mode scan`.
+fn option_value<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
+    args.iter()
+        .position(|a| a == name)
+        .and_then(|i| args.get(i + 1))
+        .map(|s| s.as_str())
+}
+
+/// `cargo flamegraph -- --benchmark-triangles [--mode bari|scan|wire|all] [--iterations N]`
+/// Rasteriza muchas veces los casos de prueba y termina sin abrir la ventana,
+/// para que el perfilador solo vea el trabajo de rasterización.
+fn run_profile_benchmark(args: &[String]) {
+    let modes = match option_value(args, "--mode").unwrap_or("all") {
+        "bari" => vec![TriangleMode::FilledBarycentric],
+        "scan" => vec![TriangleMode::FilledScanline],
+        "wire" => vec![TriangleMode::Wireframe],
+        _ => vec![
+            TriangleMode::FilledBarycentric,
+            TriangleMode::FilledScanline,
+        ],
+    };
+    let iterations: u32 = option_value(args, "--iterations")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(100);
+
+    let set = benchmark_sets().remove(0);
+    for mode in modes {
+        let start = Instant::now();
+        let mut total_fragments = 0;
+        for _ in 0..iterations {
+            let fragments = rasterize(std::hint::black_box(&set.triangles), mode);
+            total_fragments += std::hint::black_box(fragments).len();
+        }
+        println!(
+            "{}: {} iteraciones sobre '{}' en {:?} ({} fragmentos por iteración)",
+            mode_name(mode),
+            iterations,
+            set.name,
+            start.elapsed(),
+            total_fragments / iterations.max(1) as usize
+        );
+    }
 }
 
 /// `cargo run --release -- --measure`
