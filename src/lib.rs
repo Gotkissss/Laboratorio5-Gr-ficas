@@ -2,6 +2,7 @@
 // módulos desde la ventana, desde las pruebas y desde los benchmarks.
 
 pub mod color;
+pub mod compare;
 pub mod fragment;
 pub mod framebuffer;
 pub mod line;

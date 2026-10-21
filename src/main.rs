@@ -3,6 +3,7 @@ use std::time::Instant;
 use raylib::prelude::*;
 
 use rellenar_triangulos::color::Color as Rgb;
+use rellenar_triangulos::compare::compare;
 use rellenar_triangulos::framebuffer::{Framebuffer, HEIGHT, WIDTH};
 use rellenar_triangulos::pipeline::{primitive_assembly, process_fragments, rasterize};
 use rellenar_triangulos::scenes;
@@ -19,6 +20,57 @@ fn mode_name(mode: TriangleMode) -> &'static str {
 }
 
 fn main() {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.iter().any(|a| a == "--compare") {
+        run_comparison();
+        return;
+    }
+    run_window();
+}
+
+/// `cargo run --release -- --compare`
+/// Compara las posiciones que generan los dos rellenos en cada caso de prueba.
+fn run_comparison() {
+    println!(
+        "{:<40} {:>7} {:>7} {:>7} {:>7} {:>6} {:>6} {:>8}",
+        "caso", "bari", "scan", "solo B", "solo S", "rep B", "rep S", "inverso"
+    );
+    let mut all_equal = true;
+    for scene in scenes::test_cases() {
+        let r = compare(&scene.vertices, WIDTH, HEIGHT);
+        let reversed_ok = !r.barycentric_changes_when_reversed && !r.scanline_changes_when_reversed;
+        println!(
+            "{:<40} {:>7} {:>7} {:>7} {:>7} {:>6} {:>6} {:>8}",
+            scene.name,
+            r.barycentric_count,
+            r.scanline_count,
+            r.only_barycentric.len(),
+            r.only_scanline.len(),
+            r.barycentric_duplicates,
+            r.scanline_duplicates,
+            if reversed_ok { "igual" } else { "CAMBIA" }
+        );
+        if !r.same_positions() {
+            all_equal = false;
+            let sample: Vec<_> = r.only_barycentric.iter().take(4).collect();
+            if !sample.is_empty() {
+                println!("    ejemplo solo baricentrico: {:?}", sample);
+            }
+            let sample: Vec<_> = r.only_scanline.iter().take(4).collect();
+            if !sample.is_empty() {
+                println!("    ejemplo solo scanline:     {:?}", sample);
+            }
+        }
+    }
+    println!();
+    if all_equal {
+        println!("Ambos algoritmos generan exactamente las mismas posiciones en todos los casos.");
+    } else {
+        println!("Hay diferencias entre los algoritmos (ver arriba).");
+    }
+}
+
+fn run_window() {
     let (mut window, thread) = raylib::init()
         .size(WIDTH, HEIGHT)
         .title("Laboratorio 5 - Rellenar triángulos")
