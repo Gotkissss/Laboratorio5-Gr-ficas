@@ -233,14 +233,18 @@ ejemplo, el triángulo grande con scanline v2 varió entre 0.70 y 1.14 ms), por 
 
 ## Perfil con `cargo flamegraph`
 
-Los archivos están en [`perfil/v1/`](perfil/v1/) (se pueden abrir en el navegador y hacer
-clic para acercar):
+Los archivos están en [`perfil/v1/`](perfil/v1/). GitHub los muestra como imagen fija; para
+usar la búsqueda y hacer clic para acercar hay que descargarlos y abrirlos en el navegador.
 
 - [`flamegraph.svg`](perfil/v1/flamegraph.svg): los dos rellenos en la misma corrida
 - [`flamegraph_baricentrico.svg`](perfil/v1/flamegraph_baricentrico.svg)
 - [`flamegraph_scanline.svg`](perfil/v1/flamegraph_scanline.svg)
 
 ![flamegraph de ambos rellenos](perfil/v1/flamegraph.svg)
+
+Los bloques que solo dicen una dirección (`0x7FFB...`) son funciones de las DLL de Windows,
+que no traen símbolos. Aparecen justo encima de `alloc::vec::...`, o sea que son el
+administrador de memoria del sistema pidiendo y copiando memoria cuando el `Vec` crece.
 
 Lo que vi (porcentaje de muestras en que aparece cada función; recordar que el ancho es la
 proporción de muestras, **no** el orden en que se ejecutan):
